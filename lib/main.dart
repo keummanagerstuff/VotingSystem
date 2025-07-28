@@ -1,6 +1,14 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'firebase_options.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.web, // 웹 전용이니까 이렇게!
+  );
   runApp(const MyApp());
 }
 
@@ -29,48 +37,75 @@ class _MyHomePageState extends State<MyHomePage> {
   Offset _offset = Offset.zero;
   VoteStatus _status = VoteStatus.none;
 
+  final velocityThreshold = 250;
+  final voteKey = 'lastVote';
+
   void _handleUpdate(DragUpdateDetails details) {
     setState(() {
       _offset += details.delta;
     });
   }
 
-  void _handleEnd(DragEndDetails details) {
+  void _handleEnd(DragEndDetails details) async {
     final vx = details.velocity.pixelsPerSecond.dx;
     final vy = details.velocity.pixelsPerSecond.dy;
-
-    print('➡️ vx: $vx, ⬇️ vy: $vy');
 
     final absVx = vx.abs();
     final absVy = vy.abs();
 
     VoteStatus newStatus = VoteStatus.none;
 
-    // 최소 속도 임계값 (기준선)
-    const velocityThreshold = 250;
-
     if (absVx > velocityThreshold || absVy > velocityThreshold) {
-      if (absVx > absVy * 1.5) {
-        // 수평 스와이프 우선
-        if (vx > 0) {
-          newStatus = VoteStatus.like;
-        } else {
-          newStatus = VoteStatus.dislike;
-        }
-      } else if (absVy > absVx * 1.5) {
-        // 수직 스와이프 우선
-        if (vy > 0) {
-          newStatus = VoteStatus.hold;
-        }
-      } else {
-        // 비율 애매 → 아무것도 선택하지 않음
-        print('⚠️ ambiguous swipe angle');
-      }
-    }
+      final ratio = absVx / absVy;
 
-    setState(() {
-      _offset = Offset.zero;
-      _status = newStatus;
+      if (ratio > 2) {
+        newStatus = vx > 0 ? VoteStatus.like : VoteStatus.dislike;
+      } else if (ratio < 0.5 && vy > 0) {
+        newStatus = VoteStatus.hold;
+      } else {
+        print('⚠️ 대각선 스와이프 → 무시');
+        return;
+      }
+
+      final newVote = newStatus.name;
+      final prefs = await SharedPreferences.getInstance();
+      final oldVote = prefs.getString(voteKey);
+
+      if (oldVote == newVote) {
+        print('🛑 동일 투표 무시');
+      } else {
+        await updateVote(newVote, oldVote);
+        await prefs.setString(voteKey, newVote);
+        print('✅ 투표 완료: $newVote (이전: $oldVote)');
+      }
+
+      setState(() {
+        _offset = Offset.zero;
+        _status = newStatus;
+      });
+    }
+  }
+
+  Future<void> updateVote(String newVote, String? oldVote) async {
+    final ref = FirebaseFirestore.instance.collection('vote').doc('result');
+
+    await FirebaseFirestore.instance.runTransaction((transaction) async {
+      final snapshot = await transaction.get(ref);
+      final data = snapshot.data() ?? {};
+
+      final updated = {
+        'like': (data['like'] ?? 0) as int,
+        'dislike': (data['dislike'] ?? 0) as int,
+        'hold': (data['hold'] ?? 0) as int,
+      };
+
+      if (oldVote != null && updated.containsKey(oldVote)) {
+        updated[oldVote] = updated[oldVote]! - 1;
+      }
+
+      updated[newVote] = (updated[newVote] ?? 0) + 1;
+
+      transaction.set(ref, updated);
     });
   }
 
