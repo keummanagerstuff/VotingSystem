@@ -109,7 +109,7 @@ class _MyHomePageState extends State<MyHomePage> {
                 ),
               ),
               if (!isSelected)
-                Padding(
+                const Padding(
                   padding: EdgeInsets.only(top: 20),
                   child: Text(
                     '카드를 스와이프하세요',
