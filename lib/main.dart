@@ -41,17 +41,30 @@ class _MyHomePageState extends State<MyHomePage> {
 
     print('➡️ vx: $vx, ⬇️ vy: $vy');
 
+    final absVx = vx.abs();
+    final absVy = vy.abs();
+
     VoteStatus newStatus = VoteStatus.none;
 
-    if (vx.abs() > vy.abs()) {
-      if (vx > 250) {
-        newStatus = VoteStatus.like;
-      } else if (vx < -250) {
-        newStatus = VoteStatus.dislike;
-      }
-    } else {
-      if (vy > 250) {
-        newStatus = VoteStatus.hold;
+    // 최소 속도 임계값 (기준선)
+    const velocityThreshold = 250;
+
+    if (absVx > velocityThreshold || absVy > velocityThreshold) {
+      if (absVx > absVy * 1.5) {
+        // 수평 스와이프 우선
+        if (vx > 0) {
+          newStatus = VoteStatus.like;
+        } else {
+          newStatus = VoteStatus.dislike;
+        }
+      } else if (absVy > absVx * 1.5) {
+        // 수직 스와이프 우선
+        if (vy > 0) {
+          newStatus = VoteStatus.hold;
+        }
+      } else {
+        // 비율 애매 → 아무것도 선택하지 않음
+        print('⚠️ ambiguous swipe angle');
       }
     }
 
@@ -112,7 +125,7 @@ class _MyHomePageState extends State<MyHomePage> {
                       padding: EdgeInsets.all(24),
                       child: Center(
                         child: Text(
-                          '이 항목이 마음에 드시나요?',
+                          '마음에 드시나요?',
                           textAlign: TextAlign.center,
                           style: TextStyle(fontSize: 20),
                         ),
