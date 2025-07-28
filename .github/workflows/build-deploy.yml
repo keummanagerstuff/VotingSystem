@@ -26,12 +26,7 @@ jobs:
 
       - name: Add .nojekyll
         run: echo > build/web/.nojekyll
-
-      - name: Setup Git User
-        run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-
+        
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
