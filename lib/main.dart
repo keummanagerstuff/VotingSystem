@@ -35,24 +35,29 @@ class _MyHomePageState extends State<MyHomePage> {
     });
   }
 
-  void _handleEnd(DragEndDetails details) {
-    final vx = details.velocity.pixelsPerSecond.dx;
-    final vy = details.velocity.pixelsPerSecond.dy;
+void _handleEnd(DragEndDetails details) {
+  final vx = details.velocity.pixelsPerSecond.dx;
+  final vy = details.velocity.pixelsPerSecond.dy;
 
-    VoteStatus newStatus = VoteStatus.none;
+  // 스와이프 우선 방향 결정
+  if (vx.abs() > vy.abs()) {
+    // 좌우 스와이프 우선
     if (vx > 300) {
-      newStatus = VoteStatus.like;
+      _status = VoteStatus.like;
     } else if (vx < -300) {
-      newStatus = VoteStatus.dislike;
-    } else if (vy > 300) {
-      newStatus = VoteStatus.hold;
+      _status = VoteStatus.dislike;
     }
-
-    setState(() {
-      _offset = Offset.zero;
+  } else {
+    // 위아래 스와이프 우선
+    if (vy > 300) {
       _status = VoteStatus.hold;
-    });
+    }
   }
+
+  setState(() {
+    _offset = Offset.zero;
+  });
+}
 
   String _statusText() {
     switch (_status) {
