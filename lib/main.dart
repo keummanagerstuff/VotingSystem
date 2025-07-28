@@ -35,29 +35,31 @@ class _MyHomePageState extends State<MyHomePage> {
     });
   }
 
-void _handleEnd(DragEndDetails details) {
-  final vx = details.velocity.pixelsPerSecond.dx;
-  final vy = details.velocity.pixelsPerSecond.dy;
+  void _handleEnd(DragEndDetails details) {
+    final vx = details.velocity.pixelsPerSecond.dx;
+    final vy = details.velocity.pixelsPerSecond.dy;
 
-  // 스와이프 우선 방향 결정
-  if (vx.abs() > vy.abs()) {
-    // 좌우 스와이프 우선
-    if (vx > 300) {
-      _status = VoteStatus.like;
-    } else if (vx < -300) {
-      _status = VoteStatus.dislike;
+    print('➡️ vx: $vx, ⬇️ vy: $vy');
+
+    VoteStatus newStatus = VoteStatus.none;
+
+    if (vx.abs() > vy.abs()) {
+      if (vx > 250) {
+        newStatus = VoteStatus.like;
+      } else if (vx < -250) {
+        newStatus = VoteStatus.dislike;
+      }
+    } else {
+      if (vy > 250) {
+        newStatus = VoteStatus.hold;
+      }
     }
-  } else {
-    // 위아래 스와이프 우선
-    if (vy > 300) {
-      _status = VoteStatus.hold;
-    }
+
+    setState(() {
+      _offset = Offset.zero;
+      _status = newStatus;
+    });
   }
-
-  setState(() {
-    _offset = Offset.zero;
-  });
-}
 
   String _statusText() {
     switch (_status) {
@@ -75,6 +77,8 @@ void _handleEnd(DragEndDetails details) {
   @override
   Widget build(BuildContext context) {
     final isSelected = _status != VoteStatus.none;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final screenHeight = MediaQuery.of(context).size.height;
 
     return Scaffold(
       body: SafeArea(
@@ -101,13 +105,17 @@ void _handleEnd(DragEndDetails details) {
                   child: Card(
                     elevation: 12,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: const Center(
-                      child: Text(
-                        '마음에 드시나요?',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 20),
+                        borderRadius: BorderRadius.circular(20)),
+                    child: Container(
+                      width: screenWidth * 0.9,
+                      height: screenHeight * 0.75,
+                      padding: EdgeInsets.all(24),
+                      child: Center(
+                        child: Text(
+                          '이 항목이 마음에 드시나요?',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(fontSize: 20),
+                        ),
                       ),
                     ),
                   ),
