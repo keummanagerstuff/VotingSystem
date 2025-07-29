@@ -1,9 +1,8 @@
-import 'dart:math';
-
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:uuid/uuid.dart';
 import 'firebase_options.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -39,62 +38,27 @@ class MyHomePage extends StatefulWidget {
 class _MyHomePageState extends State<MyHomePage> {
   VoteStatus _status = VoteStatus.none;
 
-  final voteKey = 'lastVote';
-
-  Future<void> updateVote(VoteStatus newVote) async {
+  Future<String> getUserId() async {
     final prefs = await SharedPreferences.getInstance();
-    final oldVoteStr = prefs.getString('lastVote');
-    final oldVote = _stringToVoteStatus(oldVoteStr);
-
-    final isCancelling = oldVote == newVote;
-
-    if (newVote != VoteStatus.none || oldVote != VoteStatus.none) {
-      final ref = FirebaseFirestore.instance.collection('vote').doc('result');
-
-      await FirebaseFirestore.instance.runTransaction((transaction) async {
-        final snapshot = await transaction.get(ref);
-        final data = snapshot.data() ?? {};
-
-        final updated = {
-          'like': (data['like'] ?? 0) as int,
-          'dislike': (data['dislike'] ?? 0) as int,
-          'hold': (data['hold'] ?? 0) as int,
-        };
-
-        if (oldVote != VoteStatus.none) {
-          updated[oldVote.name] = (updated[oldVote.name] ?? 0) - 1;
-        }
-
-        if (!isCancelling && newVote != VoteStatus.none) {
-          updated[newVote.name] = (updated[newVote.name] ?? 0) + 1;
-        }
-
-        transaction.set(ref, updated);
-      });
+    String? id = prefs.getString('userId');
+    if (id == null) {
+      id = const Uuid().v4();
+      await prefs.setString('userId', id);
     }
-
-    if (isCancelling) {
-      await prefs.remove('lastVote');
-    } else {
-      await prefs.setString('lastVote', newVote.name);
-    }
-
-    setState(() {
-      _status = isCancelling ? VoteStatus.none : newVote;
-    });
+    return id;
   }
 
-  VoteStatus _stringToVoteStatus(String? value) {
-    switch (value) {
-      case 'like':
-        return VoteStatus.like;
-      case 'dislike':
-        return VoteStatus.dislike;
-      case 'hold':
-        return VoteStatus.hold;
-      default:
-        return VoteStatus.none;
-    }
+  Future<void> vote(VoteStatus newVote) async {
+    final userId = await getUserId();
+
+    await FirebaseFirestore.instance
+        .collection('votes')
+        .doc(userId)
+        .set({'vote': newVote.name});
+
+    setState(() {
+      _status = newVote;
+    });
   }
 
   @override
@@ -132,7 +96,26 @@ class _MyHomePageState extends State<MyHomePage> {
               return Padding(
                 padding: const EdgeInsets.all(20),
                 child: GestureDetector(
-                  onTap: () => updateVote(voteKey),
+                  onTap: () async {
+                    final userId = await getUserId(); // UUID 얻기
+                    final oldStatus = _status;
+
+                    setState(() {
+                      _status =
+                          (oldStatus == voteKey) ? VoteStatus.none : voteKey;
+                    });
+
+                    final voteCollection =
+                        FirebaseFirestore.instance.collection('votes');
+
+                    if (_status == VoteStatus.none) {
+                      await voteCollection.doc(userId).delete(); // 선택 해제시 삭제
+                    } else {
+                      await voteCollection
+                          .doc(userId)
+                          .set({'vote': _status.name});
+                    }
+                  },
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 200),
                     width: screenWidth - 120,
